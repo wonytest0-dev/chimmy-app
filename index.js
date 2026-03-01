@@ -210,10 +210,11 @@ async function run() {
   // SEND TELEGRAM
   // ======================
 
+  for (const page of posters) {
   await sendToTelegram(
     process.env.TELEGRAM_TOKEN,
     process.env.TELEGRAM_CHAT_ID,
-    poster,
+    page,
     "🍎 Apple Music Jimin Update"
   );
 
