@@ -9,33 +9,24 @@ const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const WIDTH = 1080;
 const MAX_HEIGHT = 1700;
 const ROW_HEIGHT = 90;
-
 const STORE_FILE = "rank_store.json";
 
 const CITY_LIST = [
-"seoul","tokyo","new-york","los-angeles","london",
-"paris","bangkok","singapore","jakarta"
+  "seoul","tokyo","new-york","los-angeles",
+  "london","paris","bangkok","singapore","jakarta"
 ];
-
-/* ======================
-   SAFE REQUEST
-====================== */
 
 async function safeGet(url) {
   try {
     const { data } = await axios.get(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
-      timeout: 10000
+      timeout: 15000
     });
     return data;
   } catch {
     return null;
   }
 }
-
-/* ======================
-   LOAD / SAVE STORE
-====================== */
 
 function loadStore() {
   if (!fs.existsSync(STORE_FILE)) return {};
@@ -46,30 +37,18 @@ function saveStore(data) {
   fs.writeFileSync(STORE_FILE, JSON.stringify(data, null, 2));
 }
 
-/* ======================
-   MOVEMENT
-====================== */
-
-function getMovement(oldRank, newRank) {
+function movement(oldRank, newRank) {
   if (!oldRank) return "NEW";
   if (newRank < oldRank) return `+${oldRank - newRank}`;
   if (newRank > oldRank) return `-${newRank - oldRank}`;
   return "=";
 }
 
-/* ======================
-   GET COUNTRY LIST
-====================== */
-
 async function getCountries() {
   const data = await safeGet("https://rss.applemarketingtools.com/api/v2/storefronts.json");
   if (!data?.storefronts) return ["us"];
   return data.storefronts.map(s => s.code);
 }
-
-/* ======================
-   GET CHART
-====================== */
 
 async function getChart(country) {
   const data = await safeGet(
@@ -82,26 +61,21 @@ async function getChart(country) {
     ? data.feed.entry
     : [data.feed.entry];
 
-  return entries.map((song, index) => ({
+  return entries.map((song, i) => ({
     name: song["im:name"]?.label || "",
-    artistName: song["im:artist"]?.label || "",
-    rank: index + 1
+    artist: song["im:artist"]?.label || "",
+    rank: i + 1
   }));
 }
-
-/* ======================
-   FILTER JIMIN
-====================== */
 
 function filterJimin(list, prefix, store, newStore) {
   let result = [];
 
   list.forEach(song => {
-    if (!song.artistName.toLowerCase().includes("jimin")) return;
+    if (!song.artist.toLowerCase().includes("jimin")) return;
 
     const key = `${prefix}_${song.name}`;
-    const oldRank = store[key];
-    const move = getMovement(oldRank, song.rank);
+    const move = movement(store[key], song.rank);
 
     newStore[key] = song.rank;
 
@@ -116,20 +90,12 @@ function filterJimin(list, prefix, store, newStore) {
   return result;
 }
 
-/* ======================
-   DRAW FLAG
-====================== */
-
 async function drawFlag(ctx, code, x, y) {
   try {
-    const flag = await loadImage(`https://flagcdn.com/w40/${code}.png`);
-    ctx.drawImage(flag, x, y, 48, 32);
+    const img = await loadImage(`https://flagcdn.com/w40/${code}.png`);
+    ctx.drawImage(img, x, y, 48, 32);
   } catch {}
 }
-
-/* ======================
-   WRAP TEXT
-====================== */
 
 function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   const words = text.split(" ");
@@ -151,16 +117,10 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   return currentY;
 }
 
-/* ======================
-   CREATE POSTER
-====================== */
-
 async function createPoster(globalData, countryData, cityData) {
-
-  const allRows = [...globalData, ...countryData, ...cityData];
-  const perPage = Math.floor((MAX_HEIGHT - 500) / ROW_HEIGHT);
-  const totalPages = Math.ceil(allRows.length / perPage);
-
+  const all = [...globalData, ...countryData, ...cityData];
+  const perPage = Math.floor((MAX_HEIGHT - 450) / ROW_HEIGHT);
+  const totalPages = Math.ceil(all.length / perPage);
   let pages = [];
 
   for (let page = 0; page < totalPages; page++) {
@@ -168,7 +128,7 @@ async function createPoster(globalData, countryData, cityData) {
     const canvas = createCanvas(WIDTH, MAX_HEIGHT);
     const ctx = canvas.getContext("2d");
 
-    ctx.fillStyle = "#f3f3f3";
+    ctx.fillStyle = "#f2f2f2";
     ctx.fillRect(0, 0, WIDTH, MAX_HEIGHT);
 
     ctx.fillStyle = "#f4c63d";
@@ -188,8 +148,7 @@ async function createPoster(globalData, countryData, cityData) {
     ctx.fillText(new Date().toLocaleString(), 300, 210);
 
     let y = 320;
-
-    const slice = allRows.slice(page * perPage, (page + 1) * perPage);
+    const slice = all.slice(page * perPage, (page + 1) * perPage);
 
     ctx.font = "36px Arial";
 
@@ -210,7 +169,7 @@ async function createPoster(globalData, countryData, cityData) {
       ctx.fillText(item.move, WIDTH - 160, y - 10);
 
       if (item.prefix.length === 2) {
-        await drawFlag(ctx, item.prefix.toLowerCase(), WIDTH - 220, y - 38);
+        await drawFlag(ctx, item.prefix.toLowerCase(), WIDTH - 230, y - 40);
       }
 
       y += ROW_HEIGHT;
@@ -227,12 +186,7 @@ async function createPoster(globalData, countryData, cityData) {
   return pages;
 }
 
-/* ======================
-   SEND TELEGRAM
-====================== */
-
 async function send(buffer) {
-
   const form = new FormData();
   form.append("chat_id", CHAT_ID);
   form.append("photo", buffer, "chart.png");
@@ -244,12 +198,7 @@ async function send(buffer) {
   );
 }
 
-/* ======================
-   MAIN
-====================== */
-
 async function run() {
-
   if (!TOKEN || !CHAT_ID) return;
 
   const store = loadStore();
@@ -273,7 +222,6 @@ async function run() {
   }
 
   if (!globalData.length && !countryData.length && !cityData.length) {
-    console.log("No Jimin found.");
     return;
   }
 
