@@ -206,19 +206,26 @@ async function run() {
 
   const poster = await renderPoster(globalData, countryData, cityData);
 
-  // ======================
-  // SEND TELEGRAM
-  // ======================
+// ======================
+// RENDER POSTER
+// ======================
 
-  for (const page of posters) {
+const posters = await renderPoster(globalData, countryData, cityData);
+
+// ======================
+// SEND TELEGRAM
+// ======================
+
+for (const page of posters) {
   await sendToTelegram(
     process.env.TELEGRAM_TOKEN,
     process.env.TELEGRAM_CHAT_ID,
     page,
     "🍎 Apple Music Jimin Update"
   );
+}
 
-  console.log("Sent successfully.");
+console.log("Sent successfully.");
 }
 
 run();
