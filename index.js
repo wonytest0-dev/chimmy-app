@@ -73,7 +73,7 @@ async function getCountries() {
 
 async function getChart(country) {
   const data = await safeGet(
-    `https://itunes.apple.com/${country}/rss/topsongs/limit=200/json
+    `https://itunes.apple.com/${country}/rss/topsongs/limit=200/json`
   );
 
   if (!data?.feed?.entry) return [];
