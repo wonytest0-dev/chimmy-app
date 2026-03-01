@@ -149,8 +149,7 @@ async function renderPoster(globalData, countryData, cityData) {
         grouped[song].forEach(entry => {
 
           checkOverflow();
-
-          const line = `${entry.country.toUpperCase()}  #${entry.rank}`;
+const line = `${(entry.prefix || "").toUpperCase()}`
 
           ctx.fillStyle = "#000";
           ctx.fillText(line, 200, y);
