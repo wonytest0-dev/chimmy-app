@@ -42,7 +42,7 @@ function saveJSON(file, data) {
 function movement(oldRank, newRank) {
   if (!oldRank) return "NEW";
   if (newRank < oldRank) return `+${oldRank - newRank}`;
-  if (newRank > oldRank) return `-${newRank - oldRank}`;
+  if (newRank > oldRank) return `-${newRank - newRank}`;
   return "=";
 }
 
@@ -85,14 +85,12 @@ async function run() {
   // ======================
 
   const globalRSS = await fetchRSS("https://itunes.apple.com/rss/topsongs/limit=100/json");
-
   const globalEntries = normalizeEntries(globalRSS);
 
   if (globalEntries.length > 0) {
     newTimestamp = globalRSS.feed.updated?.label || null;
 
     globalEntries.forEach((song, i) => {
-
       if (!song["im:artist"]) return;
 
       if (song["im:artist"].label.toLowerCase().includes(TARGET)) {
@@ -136,7 +134,7 @@ async function run() {
         countryData.push({
           rank: i + 1,
           title: song["im:name"].label,
-          prefix: flagEmoji(c),
+          prefix: c,   // ✅ FIXED (no more flag)
           change: move
         });
       }
@@ -175,27 +173,15 @@ async function run() {
     });
   }
 
-  // ======================
-  // STOP IF NO DATA
-  // ======================
-
   if (!globalData.length && !countryData.length && !cityData.length) {
     console.log("No Jimin data found.");
     return;
   }
 
-  // ======================
-  // AUTO MODE TIMESTAMP CHECK
-  // ======================
-
   if (!isManual && oldSnapshot.timestamp === newTimestamp) {
     console.log("Chart not updated yet.");
     return;
   }
-
-  // ======================
-  // SAVE STATE
-  // ======================
 
   saveJSON(STORE_FILE, newStore);
   saveJSON(SNAPSHOT_FILE, { timestamp: newTimestamp });
@@ -204,28 +190,22 @@ async function run() {
   // RENDER POSTER
   // ======================
 
-  const poster = await renderPoster(globalData, countryData, cityData);
+  const posters = await renderPoster(globalData, countryData, cityData);
 
-// ======================
-// RENDER POSTER
-// ======================
+  // ======================
+  // SEND TELEGRAM
+  // ======================
 
-const posters = await renderPoster(globalData, countryData, cityData);
+  for (const page of posters) {
+    await sendToTelegram(
+      process.env.TELEGRAM_TOKEN,
+      process.env.TELEGRAM_CHAT_ID,
+      page,
+      "🍎 Apple Music Jimin Update"
+    );
+  }
 
-// ======================
-// SEND TELEGRAM
-// ======================
-
-for (const page of posters) {
-  await sendToTelegram(
-    process.env.TELEGRAM_TOKEN,
-    process.env.TELEGRAM_CHAT_ID,
-    page,
-    "🍎 Apple Music Jimin Update"
-  );
-}
-
-console.log("Sent successfully.");
+  console.log("Sent successfully.");
 }
 
 run();
