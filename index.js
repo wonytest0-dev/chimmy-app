@@ -73,10 +73,20 @@ async function getCountries() {
 
 async function getChart(country) {
   const data = await safeGet(
-    `https://rss.applemarketingtools.com/api/v2/${country}/music/most-played/200/songs.json`
+    https://itunes.apple.com/${country}/rss/topsongs/limit=200/json
   );
-  if (!data?.feed?.results) return [];
-  return data.feed.results;
+
+  if (!data?.feed?.entry) return [];
+
+  const entries = Array.isArray(data.feed.entry)
+    ? data.feed.entry
+    : [data.feed.entry];
+
+  return entries.map((song, index) => ({
+    name: song["im:name"]?.label || "",
+    artistName: song["im:artist"]?.label || "",
+    rank: index + 1
+  }));
 }
 
 /* ======================
