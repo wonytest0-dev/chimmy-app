@@ -1,7 +1,7 @@
 {
-  "name": "chimmy-apple-music",
+  "name": "chimmy-jimin-full-final",
   "version": "1.0.0",
-  "main": "index.js",
+  "type": "commonjs",
   "dependencies": {
     "axios": "^1.6.0",
     "canvas": "^2.11.2",
