@@ -40,31 +40,29 @@ function saveStore(data) {
 function movement(oldRank, newRank) {
   if (!oldRank) return "NEW";
   if (newRank < oldRank) return `+${oldRank - newRank}`;
-  if (newRank > oldRank) return `-${newRank - oldRank}`;
+  if (newRank > oldRank) return `-${newRank - newRank}`;
   return "=";
 }
 
 async function getCountries() {
-  const data = await safeGet("https://rss.applemarketingtools.com/api/v2/storefronts.json");
+  const data = await safeGet(
+    "https://rss.applemarketingtools.com/api/v2/storefronts.json"
+  );
   if (!data?.storefronts) return ["us"];
   return data.storefronts.map(s => s.code);
 }
 
-async function getChart(country) {
+async function getAppleMusicChart(country) {
   const data = await safeGet(
-    `https://itunes.apple.com/${country}/rss/topsongs/limit=200/json`
+    `https://rss.applemarketingtools.com/api/v2/${country}/music/most-played/200/songs.json`
   );
 
-  if (!data?.feed?.entry) return [];
+  if (!data?.feed?.results) return [];
 
-  const entries = Array.isArray(data.feed.entry)
-    ? data.feed.entry
-    : [data.feed.entry];
-
-  return entries.map((song, i) => ({
-    name: song["im:name"]?.label || "",
-    artist: song["im:artist"]?.label || "",
-    rank: i + 1
+  return data.feed.results.map(song => ({
+    name: song.name,
+    artist: song.artistName,
+    rank: song.rank
   }));
 }
 
@@ -117,10 +115,9 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   return currentY;
 }
 
-async function createPoster(globalData, countryData, cityData) {
-  const all = [...globalData, ...countryData, ...cityData];
+async function createPoster(allData) {
   const perPage = Math.floor((MAX_HEIGHT - 450) / ROW_HEIGHT);
-  const totalPages = Math.ceil(all.length / perPage);
+  const totalPages = Math.ceil(allData.length / perPage);
   let pages = [];
 
   for (let page = 0; page < totalPages; page++) {
@@ -148,7 +145,7 @@ async function createPoster(globalData, countryData, cityData) {
     ctx.fillText(new Date().toLocaleString(), 300, 210);
 
     let y = 320;
-    const slice = all.slice(page * perPage, (page + 1) * perPage);
+    const slice = allData.slice(page * perPage, (page + 1) * perPage);
 
     ctx.font = "36px Arial";
 
@@ -206,26 +203,16 @@ async function run() {
 
   const countries = await getCountries();
 
-  const globalRaw = await getChart("us");
-  const globalData = filterJimin(globalRaw, "global", store, newStore);
+  let allData = [];
 
-  let countryData = [];
   for (let c of countries) {
-    const raw = await getChart(c);
-    countryData.push(...filterJimin(raw, c, store, newStore));
+    const raw = await getAppleMusicChart(c);
+    allData.push(...filterJimin(raw, c, store, newStore));
   }
 
-  let cityData = [];
-  for (let city of CITY_LIST) {
-    const raw = await getChart(city);
-    cityData.push(...filterJimin(raw, city, store, newStore));
-  }
+  if (!allData.length) return;
 
-  if (!globalData.length && !countryData.length && !cityData.length) {
-    return;
-  }
-
-  const pages = await createPoster(globalData, countryData, cityData);
+  const pages = await createPoster(allData);
 
   for (let p of pages) {
     await send(p);
