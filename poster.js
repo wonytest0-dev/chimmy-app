@@ -24,31 +24,74 @@ function nowDate() {
   });
 }
 
+/* ========= WORD WRAP ========= */
+
+function drawWrappedText(ctx, text, x, y, maxWidth) {
+  const words = text.split(" ");
+  let line = "";
+  let lines = [];
+
+  for (let n = 0; n < words.length; n++) {
+    const testLine = line + words[n] + " ";
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth && n > 0) {
+      lines.push(line);
+      line = words[n] + " ";
+    } else {
+      line = testLine;
+    }
+  }
+  lines.push(line);
+
+  lines.forEach(l => {
+    ctx.fillText(l.trim(), x, y);
+    y += ROW;
+  });
+
+  return y;
+}
+
+/* ========= GROUP COUNTRY PER SONG ========= */
+
+function groupBySong(data) {
+  const grouped = {};
+  data.forEach(item => {
+    if (!grouped[item.title]) grouped[item.title] = [];
+    grouped[item.title].push(item);
+  });
+  return grouped;
+}
+
 async function renderPoster(globalData, countryData, cityData) {
 
-  const totalRows = globalData.length + countryData.length + cityData.length + 10;
-  const baseHeight = 700;
-  const height = Math.min(baseHeight + totalRows * ROW, MAX_HEIGHT);
-
   const W = 1080;
-  const canvas = createCanvas(W, height);
-  const ctx = canvas.getContext("2d");
+  const pages = [];
 
-  ctx.fillStyle = "#E6E9EE";
-  ctx.fillRect(0, 0, W, height);
+  let canvas = createCanvas(W, MAX_HEIGHT);
+  let ctx = canvas.getContext("2d");
 
-  ctx.fillStyle = "#FFFFFF";
-  roundRect(ctx, 60, 80, 960, height - 140, 40);
-  ctx.fill();
+  function drawBaseLayout() {
 
-  const bannerY = 140;
-  const gradient = ctx.createLinearGradient(0, bannerY, 0, bannerY + 280);
-  gradient.addColorStop(0, "#F9E27D");
-  gradient.addColorStop(1, "#F4C430");
+    ctx.fillStyle = "#E6E9EE";
+    ctx.fillRect(0, 0, W, MAX_HEIGHT);
 
-  ctx.fillStyle = gradient;
-  roundRect(ctx, 100, bannerY, 880, 280, 35);
-  ctx.fill();
+    ctx.fillStyle = "#FFFFFF";
+    roundRect(ctx, 60, 80, 960, MAX_HEIGHT - 140, 40);
+    ctx.fill();
+
+    const bannerY = 140;
+    const gradient = ctx.createLinearGradient(0, bannerY, 0, bannerY + 280);
+    gradient.addColorStop(0, "#F9E27D");
+    gradient.addColorStop(1, "#F4C430");
+
+    ctx.fillStyle = gradient;
+    roundRect(ctx, 100, bannerY, 880, 280, 35);
+    ctx.fill();
+
+    return bannerY;
+  }
+
+  let bannerY = drawBaseLayout();
 
   const chimmy = await loadImage("./chimmy.png");
   ctx.drawImage(chimmy, 130, bannerY + 30, 230, 230);
@@ -65,65 +108,116 @@ async function renderPoster(globalData, countryData, cityData) {
 
   let y = bannerY + 350;
 
-  function drawSection(title, data) {
+  function newPage() {
+    pages.push(canvas.toBuffer("image/png"));
+    canvas = createCanvas(W, MAX_HEIGHT);
+    ctx = canvas.getContext("2d");
+    bannerY = drawBaseLayout();
+    y = bannerY + 350;
+  }
+
+  function checkOverflow() {
+    if (y > MAX_HEIGHT - 150) {
+      newPage();
+    }
+  }
+
+  function drawSection(title, data, isCountry = false) {
+
     if (!data.length) return;
 
+    checkOverflow();
     ctx.font = "bold 36px Arial";
     ctx.fillStyle = "#000";
     ctx.fillText(title, 150, y);
     y += ROW;
 
-    data.forEach(item => {
+    if (isCountry) {
 
-      if (item.rank === 1) {
-        ctx.fillStyle = "#FFE066";
-        roundRect(ctx, 120, y - 50, 840, 70, 20);
-        ctx.fill();
-      }
+      const grouped = groupBySong(data);
 
-      ctx.fillStyle = "#000";
-      ctx.font = "bold 32px Arial";
+      Object.keys(grouped).forEach(song => {
 
-      const text =
-        item.rank === 1
-          ? `#1 🏆 ${item.title} ${item.prefix || ""}`
-          : `#${item.rank} ${item.title} ${item.prefix || ""}`;
+        checkOverflow();
 
-      ctx.fillText(text, 150, y);
+        ctx.font = "bold 32px Arial";
+        ctx.fillStyle = "#000";
+        y = drawWrappedText(ctx, song.toUpperCase(), 150, y, 700);
 
-      ctx.font = "26px Arial";
+        ctx.font = "26px Arial";
 
-      if (item.change === "NEW") {
-        ctx.fillStyle = "#FF8A00";
-        ctx.fillText("NEW", 880, y);
-      } else if (item.change.startsWith("+")) {
-        ctx.fillStyle = "#1DB954";
-        ctx.fillText("▲ " + item.change.replace("+",""), 880, y);
-      } else if (item.change.startsWith("-")) {
-        ctx.fillStyle = "#D62828";
-        ctx.fillText("▼ " + item.change.replace("-",""), 880, y);
-      } else {
-        ctx.fillStyle = "#666";
-        ctx.fillText("=", 920, y);
-      }
+        grouped[song].forEach(entry => {
+
+          checkOverflow();
+
+          const line = `${entry.country.toUpperCase()}  #${entry.rank}`;
+
+          ctx.fillStyle = "#000";
+          ctx.fillText(line, 200, y);
+
+          ctx.fillStyle = entry.change === "NEW"
+            ? "#FF8A00"
+            : entry.change.startsWith("+")
+            ? "#1DB954"
+            : entry.change.startsWith("-")
+            ? "#D62828"
+            : "#666";
+
+          ctx.fillText(entry.change, 880, y);
+
+          y += ROW;
+        });
+
+        y += ROW;
+      });
+
+    } else {
+
+      data.forEach(item => {
+
+        checkOverflow();
+
+        ctx.fillStyle = "#000";
+        ctx.font = "bold 32px Arial";
+
+        const text =
+          item.rank === 1
+            ? `#1 🏆 ${item.title}`
+            : `#${item.rank} ${item.title}`;
+
+        y = drawWrappedText(ctx, text, 150, y, 700);
+
+        ctx.font = "26px Arial";
+
+        ctx.fillStyle =
+          item.change === "NEW"
+            ? "#FF8A00"
+            : item.change.startsWith("+")
+            ? "#1DB954"
+            : item.change.startsWith("-")
+            ? "#D62828"
+            : "#666";
+
+        ctx.fillText(item.change, 880, y - ROW);
+      });
 
       y += ROW;
-    });
-
-    y += ROW;
+    }
   }
 
   drawSection("🌍 GLOBAL", globalData);
-  drawSection("🌎 COUNTRIES", countryData);
+  drawSection("🌎 COUNTRIES", countryData, true);
   drawSection("🏙 CITY", cityData);
 
   ctx.globalAlpha = 0.15;
   ctx.font = "bold 120px Arial";
   ctx.textAlign = "center";
-  ctx.fillText(WATERMARK, W / 2, height / 2);
+  ctx.fillText(WATERMARK, W / 2, MAX_HEIGHT / 2);
   ctx.globalAlpha = 1;
 
-  return canvas.toBuffer("image/png");
+  pages.push(canvas.toBuffer("image/png"));
+
+  return pages;
 }
 
 module.exports = { renderPoster };
