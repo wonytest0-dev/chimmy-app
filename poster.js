@@ -170,7 +170,8 @@ async function renderPoster(globalData,countryData,cityData){
             entry.prefix?.toUpperCase()||
             "";
 
-          const line=countryName;
+          // ✅ FIX: tambahkan rank kembali
+          const line=`#${entry.rank} ${countryName}`;
 
           ctx.fillStyle="#000";
           ctx.fillText(line,200,y);
